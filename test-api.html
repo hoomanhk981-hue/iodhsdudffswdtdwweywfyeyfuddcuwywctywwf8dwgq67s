@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>تست ساده API گیت‌هاب</title>
+</head>
+<body>
+    <h2>تست اتصال به فایل messages.json</h2>
+    <button id="testBtn">تست اتصال</button>
+    <pre id="output" style="background:#f0f0f0; padding:10px; margin-top:20px;"></pre>
+
+    <script>
+        // ========== TODO: این سه خط را با مقادیر واقعی خودت پر کن ==========
+        const GITHUB_USERNAME = "YOUR_USERNAME";   // ← مثلاً "aminrezai"
+        const REPO_NAME       = "my-chat";          // ← اگر اسم مخزن عوض است، اینجا عوض کن
+        const TOKEN           = "YOUR_TOKEN";       // ← توکن خودت را اینجا بگذار
+        // ============================================================
+
+        const url = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/messages.json`;
+        const output = document.getElementById("output");
+
+        document.getElementById("testBtn").onclick = async function() {
+            output.innerText = "در حال ارسال درخواست...";
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        Authorization: `token ${TOKEN}`,
+                        Accept: "application/vnd.github.v3+json"
+                    }
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    // موفقیت: محتوای فایل را نشان بده
+                    const content = atob(data.content);
+                    output.innerText = "✅ موفق! محتوای messages.json:\n" + content;
+                } else {
+                    // خطا از سمت گیت‌هاب
+                    output.innerText = "❌ خطا از سمت گیت‌هاب:\n" + JSON.stringify(data, null, 2);
+                }
+            } catch (err) {
+                output.innerText = "❌ خطای شبکه یا CORS:\n" + err.message;
+            }
+        };
+    </script>
+</body>
+</html>
