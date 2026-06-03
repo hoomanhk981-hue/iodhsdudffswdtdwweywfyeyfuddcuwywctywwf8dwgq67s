@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>چت خصوصی با گیت‌هاب</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(145deg, #0b1120 0%, #19223c 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .chat-container {
+            width: 90%;
+            max-width: 600px;
+            height: 85vh;
+            background: rgba(20, 30, 55, 0.7);
+            backdrop-filter: blur(12px);
+            border-radius: 32px;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chat-header {
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #bbd9ff;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .message {
+            background: rgba(10, 20, 35, 0.8);
+            border-radius: 20px;
+            padding: 8px 14px;
+            max-width: 80%;
+            align-self: flex-start;
+            color: #eef4ff;
+            word-break: break-word;
+            font-size: 0.95rem;
+            border-left: 3px solid #3b82f6;
+        }
+        .message .username {
+            font-weight: bold;
+            color: #60a5fa;
+            font-size: 0.8rem;
+            margin-right: 8px;
+        }
+        .message .time {
+            font-size: 0.65rem;
+            color: #8aa3c0;
+            margin-left: 8px;
+        }
+        .input-area {
+            padding: 16px;
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        #messageInput {
+            flex: 1;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 40px;
+            padding: 12px 18px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: 0.2s;
+        }
+        #messageInput:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
+        }
+        #sendBtn {
+            background: #3b82f6;
+            border: none;
+            border-radius: 40px;
+            padding: 0 24px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        #sendBtn:hover {
+            background: #2563eb;
+            transform: scale(0.97);
+        }
+        .status {
+            font-size: 0.7rem;
+            text-align: center;
+            padding: 6px;
+            color: #94a3b8;
+            background: rgba(0,0,0,0.3);
+        }
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+<div class="chat-container">
+    <div class="chat-header">
+        💬 چت خصوصی (ذخیره در گیت‌هاب)
+    </div>
+    <div class="messages-area" id="messagesArea">
+        <div style="text-align:center; color:#8aa3c0;">در حال اتصال ...</div>
+    </div>
+    <div class="input-area">
+        <input type="text" id="messageInput" placeholder="پیام خود را بنویسید..." autocomplete="off">
+        <button id="sendBtn">ارسال</button>
+    </div>
+    <div class="status" id="statusText">✅ آماده</div>
+</div>
+
+<script>
+    // ---------- تنظیمات اولیه (حتما تغییر دهید) ----------
+    const GITHUB_USERNAME = "hoomanhk981-hue";    // e.g., "aminrezai"
+    const REPO_NAME       = "iodhsdudffswdtdwweywfyeyfuddcuwywctywwf8dwgq67s";                         // اسم مخزن شما
+    const FILE_PATH       = "messages.json";                   // فایل دیتابیس
+    const TOKEN           = "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";       // توکن شخصی گیت‌هاب
+
+    // ---------- شناسه کاربری (یک نام موقت) ----------
+    let currentUser = localStorage.getItem("chatUsername");
+    if (!currentUser) {
+        currentUser = prompt("لطفاً یک نام کاربری برای خود انتخاب کنید:", "کاربر_" + Math.floor(Math.random()*1000));
+        if (!currentUser) currentUser = "ناشناس";
+        localStorage.setItem("chatUsername", currentUser);
+    }
+
+    const messagesDiv = document.getElementById("messagesArea");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const statusSpan = document.getElementById("statusText");
+
+    let lastMessageCount = 0;
+    let pollInterval = null;
+
+    // ---------- توابع کار با گیت‌هاب ----------
+    async function getFileSHA() {
+        const url = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${FILE_PATH}`;
+        const res = await fetch(url, {
+            headers: {
+                Authorization: `token ${TOKEN}`,
+                Accept: "application/vnd.github.v3+json"
+            }
+        });
+        if (!res.ok) throw new Error("خطا در دریافت اطلاعات فایل");
+        const data = await res.json();
+        return { sha: data.sha, content: atob(data.content) };
+    }
+
+    async function readMessages() {
+        try {
+            const { content } = await getFileSHA();
+            const messages = JSON.parse(content);
+            return Array.isArray(messages) ? messages : [];
+        } catch (e) {
+            console.error("خواندن پیام‌ها:", e);
+            return [];
+        }
+    }
+
+    async function writeMessages(messages) {
+        try {
+            const { sha, content } = await getFileSHA();
+            const newContent = btoa(JSON.stringify(messages, null, 2));
+            const url = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${FILE_PATH}`;
+            const res = await fetch(url, {
+                method: "PUT",
+                headers: {
+                    Authorization: `token ${TOKEN}`,
+                    "Content-Type": "application/json",
+                    Accept: "application/vnd.github.v3+json"
+                },
+                body: JSON.stringify({
+                    message: `پیام جدید از ${currentUser}`,
+                    content: newContent,
+                    sha: sha,
+                    branch: "main"
+                })
+            });
+            if (!res.ok) throw new Error("خطا در نوشتن روی گیت‌هاب");
+            return true;
+        } catch (e) {
+            console.error("نوشتن پیام:", e);
+            statusSpan.innerText = "❌ خطا در ارسال پیام! دوباره تلاش کنید.";
+            setTimeout(() => { statusSpan.innerText = "✅ آماده"; }, 3000);
+            return false;
+        }
+    }
+
+    // اضافه کردن پیام جدید
+    async function sendMessage(text) {
+        if (!text.trim()) return;
+        const newMsg = {
+            username: currentUser,
+            text: text.trim(),
+            time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+        };
+        const currentMsgs = await readMessages();
+        currentMsgs.push(newMsg);
+        const success = await writeMessages(currentMsgs);
+        if (success) {
+            messageInput.value = "";
+            await loadMessages();  // بلافاصله نمایش بده
+            statusSpan.innerText = "✅ ارسال شد";
+            setTimeout(() => { if(statusSpan.innerText === "✅ ارسال شد") statusSpan.innerText = "✅ آماده"; }, 1500);
+        }
+    }
+
+    // بارگذاری و نمایش پیام‌ها
+    async function loadMessages() {
+        try {
+            const messages = await readMessages();
+            if (messages.length === lastMessageCount) return;
+            lastMessageCount = messages.length;
+            
+            // رندر پیام‌ها
+            messagesDiv.innerHTML = "";
+            if (messages.length === 0) {
+                messagesDiv.innerHTML = '<div style="text-align:center; color:#8aa3c0;">✨ هنوز پیامی نیست. اولین نفر باشید!</div>';
+                return;
+            }
+            for (const msg of messages) {
+                const msgEl = document.createElement("div");
+                msgEl.className = "message";
+                msgEl.innerHTML = `<span class="username">${escapeHtml(msg.username)}</span> ${escapeHtml(msg.text)} <span class="time">${msg.time || ""}</span>`;
+                messagesDiv.appendChild(msgEl);
+            }
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        } catch (err) {
+            console.error(err);
+            messagesDiv.innerHTML = '<div style="color:red;">⚠️ خطا در دریافت پیام‌ها. اتصال اینترنت و توکن را بررسی کنید.</div>';
+        }
+    }
+
+    // کمکی برای امنیت در برابر XSS
+    function escapeHtml(str) {
+        if(!str) return "";
+        return str.replace(/[&<>]/g, function(m) {
+            if(m === "&") return "&amp;";
+            if(m === "<") return "&lt;";
+            if(m === ">") return "&gt;";
+            return m;
+        });
+    }
+
+    // شروع پولینگ هر 3 ثانیه
+    function startPolling() {
+        loadMessages(); // بار اول
+        if (pollInterval) clearInterval(pollInterval);
+        pollInterval = setInterval(loadMessages, 3000);
+    }
+
+    // رویدادها
+    sendBtn.addEventListener("click", () => sendMessage(messageInput.value));
+    messageInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") sendMessage(messageInput.value);
+    });
+
+    startPolling();
+    statusSpan.innerText = "✅ متصل به گیت‌هاب";
+</script>
+</body>
+</html>
